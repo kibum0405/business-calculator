@@ -1,5 +1,16 @@
 <template>
     <v-container>
+        <!-- 공통 헤더 -->
+        <v-toolbar flat class="mb-3" style="background-color: white;">
+            <v-card-title>디마 장부</v-card-title>
+            <v-spacer></v-spacer>
+            <v-btn icon @click="undoItem">
+                <v-icon>mdi-undo</v-icon>
+            </v-btn>
+            <v-btn icon @click="redoItem">
+                <v-icon>mdi-redo</v-icon>
+            </v-btn>
+        </v-toolbar>
         <v-row>
             <v-col cols="6">
                 <!-- 재고 데이터 테이블 -->
@@ -12,8 +23,7 @@
                 >
                     <template v-slot:top>
                         <v-toolbar flat>
-                            <v-toolbar-title>재고 데이터 테이블</v-toolbar-title>
-                            <v-spacer></v-spacer>
+                            <v-card-title>재고 : {{ totalInventory }}</v-card-title>
                             <v-text-field
                                 v-model="search"
                                 label="검색"
@@ -28,8 +38,9 @@
                         <tr>
                             <td>{{ item.name }}</td>
                             <td>{{ formatPrice(item.purchasePrice, item.unit) }}</td>
-                            <td>{{ item.purchaseDate }}</td>
                             <td>{{ item.quantity }}</td>
+                            <td>{{ formatPrice(item.purchasePrice * item.quantity, item.unit) }}</td>
+                            <td>{{ item.purchaseDate }}</td>
                             <td>
                                 <v-btn v-for="action in actions" :key="action.icon" @click="action.method(item)" density="comfortable" variant="text" icon>
                                     <v-icon small>{{ action.icon }}</v-icon>
@@ -51,8 +62,7 @@
                 >
                     <template v-slot:top>
                         <v-toolbar flat>
-                            <v-toolbar-title>판매 데이터 테이블</v-toolbar-title>
-                            <v-spacer></v-spacer>
+                            <v-card-title>순익 : {{ totalSales }}</v-card-title>
                             <v-text-field
                                 v-model="saleSearch"
                                 label="판매 검색"
@@ -68,6 +78,7 @@
                             <td>{{ item.name }}</td>
                             <td>{{ item.salePrice }}</td>
                             <td>{{ item.quantity }}</td>
+                            <td>{{ item.saleDate }}</td> <!-- 추가된 부분 -->
                             <td>{{ item.profit }}</td>
                             <td>{{ item.profitRate }}</td>
                         </tr>
@@ -96,6 +107,7 @@
 import purchaseItem from './purchaseItem.vue';
 import saleItem from './saleItem.vue';
 
+
 export default {
     name: 'mainPage',
     components: {
@@ -123,21 +135,21 @@ export default {
             headers: [
                 { title: '이름', key: 'name' },
                 { title: '가격', key: 'purchasePrice' },
-                { title: '날짜', key: 'purchaseDate' },
                 { title: '수량', key: 'quantity' },
+                { title: '총 가격', key: 'totalPrice' },
+                { title: '날짜', key: 'purchaseDate' },
                 { title: '작업', key: 'actions', sortable: false },
             ],
             actions: [
                 { icon: 'mdi-pencil', method: this.editItem },
-                { icon: 'mdi-delete', method: this.deleteItem },
                 { icon: 'mdi-cash', method: this.sellItem },
-                { icon: 'mdi-undo', method: () => this.undoItem() },
-                { icon: 'mdi-redo', method: () => this.redoItem() },
+                { icon: 'mdi-delete', method: this.deleteItem },
             ],
             saleHeaders: [
                 { title: '이름', key: 'name' },
                 { title: '가격', key: 'salePrice' },
                 { title: '수량', key: 'quantity' },
+                { title: '날짜', key: 'saleDate' }, // 추가된 부분
                 { title: '순이익', key: 'profit' },
                 { title: '수익율', key: 'profitRate' },
             ],
@@ -160,6 +172,35 @@ export default {
         }
     },
     computed: {
+        totalInventory() {
+            const totals = this.items.reduce((acc, item) => {
+                const unit = item.unit || '원';
+                if (!acc[unit]) acc[unit] = 0;
+                acc[unit] += item.purchasePrice * item.quantity;
+                return acc;
+            }, {});
+
+            const formattedTotals = ['원', 't', 'm'].map(unit => {
+                const value = totals[unit] || 0;
+                return `${this.formatPrice(value, unit)}`;
+            });
+            return `( ${formattedTotals.join(' / ')} )`;
+        },
+        totalSales() {
+            const totals = this.saleItems.reduce((acc, item) => {
+                const unit = item.unit || '원';
+                if (!acc[unit]) acc[unit] = 0;
+                // 순이익을 사용합니다
+                acc[unit] += this.parsePriceString(item.profit);
+                return acc;
+            }, {});
+
+            const formattedTotals = ['원', 't', 'm'].map(unit => {
+                const value = totals[unit] || 0;
+                return this.formatPrice(value, unit);
+            });
+            return `( ${formattedTotals.join(' / ')} )`;
+        },
         filteredItems() {
             return this.items.filter(item => {
                 return Object.keys(item).some(key =>
@@ -190,6 +231,10 @@ export default {
         }
     },
     methods: {
+        parsePriceString(priceString) {
+            // "1,000,000 원" 형식의 문자열에서 숫자만 추출
+            return parseFloat(priceString.replace(/[^0-9.-]+/g,""));
+        },
         getRowColor(item) {
             // profit 값에서 숫자만 추출
             const profit = parseFloat(item.profit.replace(/[^0-9.-]+/g, ""));
@@ -362,9 +407,10 @@ export default {
                 this.undoHistory.push({action: 'sell', item: originalItem});
                 this.redoHistory = [];
                 
+                // 재고 수량 업데이트
                 this.items[index].quantity -= item.quantity;
                 if (this.items[index].quantity < 0) {
-                    this.items[index].quantity = 0;
+                this.items[index].quantity = 0;
                 }
                 
                 // 판매 데이터 추가
@@ -372,13 +418,13 @@ export default {
                 const profitRate = ((item.salePrice - originalItem.purchasePrice) / originalItem.purchasePrice * 100).toFixed(2);
                 
                 const saleItem = {
-                    name: item.name,
-                    salePrice: this.formatPrice(item.salePrice, item.unit),
-                    quantity: item.quantity,
-                    profit: this.formatPrice(profit, item.unit),
-                    profitRate: `${profitRate}%`
+                name: item.name,
+                salePrice: this.formatPrice(item.salePrice, item.unit),
+                quantity: item.quantity,
+                saleDate: item.saleDate,
+                profit: this.formatPrice(profit, item.unit),
+                profitRate: `${profitRate}%`
                 };
-                
                 this.saleItems.push(saleItem);
             }
             this.saveToLocalStorage();
@@ -388,15 +434,19 @@ export default {
             this.closeEdit();
         },
         formatPrice(price, unit) {
-            return `${Number(price).toLocaleString()} /${unit}`;
+            return `${Number(price).toLocaleString()} ${unit}`;
         },
     },
 };
 </script>
 
 <style>
+table td,
+table th {
+    padding: 0px 4px 0px 4px !important;
+}
 .v-container {
-    max-width:1440px;
+    max-width:1680px;
 }
 .v-toolbar__content {
     height:48px !important;
@@ -408,12 +458,24 @@ export default {
     overflow: auto;
 }
 
+.inventory-table {
+    border-radius: 8px !important;
+}
+
+.sales-table {
+    border-radius: 8px !important;
+}
+
 .inventory-table .v-toolbar {
     background-color:#B3E5FC;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 }
 
 .sales-table .v-toolbar {
     background-color:#B2DFDB;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
 }
 
 .v-text-field .v-input__details {
