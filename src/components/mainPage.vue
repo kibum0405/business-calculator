@@ -3,6 +3,12 @@
         <!-- 공통 헤더 -->
         <v-toolbar flat class="mb-3" style="background-color: white;">
             <v-card-title>디마 장부</v-card-title>
+            <!-- 데이터 저장 및 불러오기 버튼 -->
+            <v-btn icon @click="saveToFile">
+                <v-icon>mdi-content-save</v-icon>
+            </v-btn>
+            <input type="file" @change="loadFromFile" />
+
             <v-spacer></v-spacer>
             <v-btn icon @click="undoItem">
                 <v-icon>mdi-undo</v-icon>
@@ -141,6 +147,7 @@ export default {
                 { title: '작업', key: 'actions', sortable: false },
             ],
             actions: [
+                { icon: 'mdi-plus', method: this.selectAddItem },
                 { icon: 'mdi-pencil', method: this.editItem },
                 { icon: 'mdi-cash', method: this.sellItem },
                 { icon: 'mdi-delete', method: this.deleteItem },
@@ -231,6 +238,42 @@ export default {
         }
     },
     methods: {
+        saveToFile() {
+            const data = {
+                inventoryItems: this.items,
+                saleItems: this.saleItems
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        },
+        loadFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = JSON.parse(e.target.result);
+                this.items = data.inventoryItems || [];
+                this.saleItems = data.saleItems || [];
+            };
+            reader.readAsText(file);
+        },
+        selectAddItem(item) {
+            // 선택된 항목의 인덱스 가져오기
+            this.editedIndex = this.items.indexOf(item);
+
+            // 선택된 항목의 이름과 단위를 가져와 편집 항목에 할당
+            this.editedItem = Object.assign({}, item, { 
+                name: item.name, 
+                unit: item.unit || '원' // 단위가 없을 경우 기본값으로 '원' 사용
+            });
+        },
         parsePriceString(priceString) {
             // "1,000,000 원" 형식의 문자열에서 숫자만 추출
             return parseFloat(priceString.replace(/[^0-9.-]+/g,""));
@@ -391,6 +434,7 @@ export default {
                 this.saveToLocalStorage();
             }
         },
+        
         sellItem(item) {
             this.editedIndex = this.items.indexOf(item);
             this.editedItem = Object.assign({}, item, { 
