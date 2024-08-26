@@ -22,6 +22,7 @@ export default defineConfig({
   server: {
     port: 3230
   },
+  base: '/business-calculator/', // GitHub Pages에서 사용할 저장소 이름으로 설정
   /* remove the need to specify .vue files https://vitejs.dev/config/#resolve-extensions
   resolve: {
     extensions: [

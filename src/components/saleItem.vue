@@ -28,6 +28,7 @@
                     v-model="localItem[field.key]"
                     :rules="field.rules"
                     :label="field.label"
+                    :disabled="isSelling && field.key === 'name' ? true : false"
                     :required="field.required"
                     :type="field.type"
                     variant="outlined"
@@ -61,6 +62,7 @@ export default {
                 unit: '원',
             }),
         },
+        isSelling: Boolean
     },
     data() {
         return {

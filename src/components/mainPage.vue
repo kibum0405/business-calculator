@@ -103,6 +103,7 @@
         <saleItem v-else
             ref="saleItemForm"
             :item="editedItem"
+            :isSelling="isSelling"
             @submit="saveSale"
             @cancel="cancelSale"
         />
@@ -245,10 +246,15 @@ export default {
             };
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
+
+            // 현재 날짜와 시간을 포맷팅하여 파일 이름에 포함
+            const now = new Date();
+            const formattedDate = `DM-${now.getFullYear()}년-${String(now.getMonth() + 1).padStart(2, '0')}월-${String(now.getDate()).padStart(2, '0')}일-${String(now.getHours()).padStart(2, '0')}시${String(now.getMinutes()).padStart(2, '0')}분`;
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'data.json';
+            a.download = `${formattedDate}.json`;
             a.click();
             URL.revokeObjectURL(url);
         },
